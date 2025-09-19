@@ -86,7 +86,7 @@ jobs:
   # ==========================================
   # Job 2: Build and push Docker images to ACR
   # ==========================================
-  build_and_push_images:
+    build_and_push_images:
     runs-on: ubuntu-latest
     needs: test_and_lint_backends
 
@@ -94,36 +94,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🔐 Login to Azure Container Registry using admin credentials
+      # Normalize registry: remove https:// and trailing /
+      - name: Normalize registry secret
+        id: norm
+        shell: bash
+        run: |
+          REG="${{ secrets.CONTAINER_REGISTRY }}"
+          # strip leading protocol if present
+          REG="${REG#https://}"
+          REG="${REG#http://}"
+          # strip trailing slash/newlines/spaces
+          REG="${REG%%/}"
+          REG="$(printf "%s" "$REG" | tr -d '\r' )"     # remove CR
+          if [ -z "$REG" ]; then
+            echo "Empty registry after normalization"; exit 1;
+          fi
+          echo "REGISTRY_CLEAN=$REG" >> "$GITHUB_ENV"
+          echo "Registry length: ${#REG}"                # helpful sanity check
+
       - name: Login to Azure Container Registry (Docker)
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.CONTAINER_REGISTRY }} # e.g. wk08acr12345.azurecr.io
+          registry: ${{ env.REGISTRY_CLEAN }}
           username: ${{ secrets.REGISTRY_UN }}
           password: ${{ secrets.REGISTRY_PW }}
 
-      # Debug step to confirm files exist and correct context
       - name: Debug repository structure
         run: |
           pwd
-          ls -R backend
+          ls -la backend
+          ls -la backend/product_service
+          ls -la backend/order_service
 
-      # Build & Push Product Service
+      # --- Product service ---
       - name: Build & push Product Service image
         working-directory: backend/product_service
         env:
-          TAG: ${{ secrets.CONTAINER_REGISTRY }}/product_service:latest
+          TAG: ${{ env.REGISTRY_CLEAN }}/product_service:latest
         run: |
-          echo "Building image: $TAG"
+          echo "Building image (len=${#TAG})"
           docker build -t "$TAG" .
           docker push "$TAG"
 
-      # Build & Push Order Service
+      # --- Order service ---
       - name: Build & push Order Service image
         working-directory: backend/order_service
         env:
-          TAG: ${{ secrets.CONTAINER_REGISTRY }}/order_service:latest
+          TAG: ${{ env.REGISTRY_CLEAN }}/order_service:latest
         run: |
-          echo "Building image: $TAG"
+          echo "Building image (len=${#TAG})"
           docker build -t "$TAG" .
           docker push "$TAG"
