@@ -96,10 +96,10 @@ jobs:
 
       - name: Build & push Product Service image
         run: |
-          docker build -t ${{ env.CONTAINER_REGISTRY }}/product_service:latest ./backend/product_service
+          docker build -t ${{ secrets.CONTAINER_REGISTRY }}/product_service:latest ./backend/product_service
           docker push ${{ env.CONTAINER_REGISTRY }}/product_service:latest
 
       - name: Build & push Order Service image
         run: |
-          docker build -t ${{ env.CONTAINER_REGISTRY }}/order_service:latest ./backend/order_service
+          docker build -t ${{ secrets.CONTAINER_REGISTRY }}/order_service:latest ./backend/order_service
           docker push ${{ env.CONTAINER_REGISTRY }}/order_service:latest
