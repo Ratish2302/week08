@@ -13,6 +13,9 @@ env:
   IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
 
 jobs:
+  # ==============================
+  # Job 1: Test and lint backends
+  # ==============================
   test_and_lint_backends:
     runs-on: ubuntu-latest
     services:
@@ -28,6 +31,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports: ["5432:5432"]
+
       order_db:
         image: postgres:15
         env:
@@ -79,27 +83,47 @@ jobs:
           POSTGRES_PASSWORD: postgres
         run: pytest tests --maxfail=1 --disable-warnings -q
 
+  # ==========================================
+  # Job 2: Build and push Docker images to ACR
+  # ==========================================
   build_and_push_images:
     runs-on: ubuntu-latest
     needs: test_and_lint_backends
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🔐 Docker login to ACR using admin creds (no Azure login needed)
+      # 🔐 Login to Azure Container Registry using admin credentials
       - name: Login to Azure Container Registry (Docker)
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.CONTAINER_REGISTRY }}   # e.g. wk08acr12345.azurecr.io
+          registry: ${{ secrets.CONTAINER_REGISTRY }} # e.g. wk08acr12345.azurecr.io
           username: ${{ secrets.REGISTRY_UN }}
           password: ${{ secrets.REGISTRY_PW }}
 
-      - name: Build & push Product Service image
+      # Debug step to confirm files exist and correct context
+      - name: Debug repository structure
         run: |
-          docker build -t ${{ secrets.CONTAINER_REGISTRY }}/product_service:latest ./backend/product_service
-          docker push ${{ env.CONTAINER_REGISTRY }}/product_service:latest
+          pwd
+          ls -R backend
 
-      - name: Build & push Order Service image
+      # Build & Push Product Service
+      - name: Build & push Product Service image
+        working-directory: backend/product_service
+        env:
+          TAG: ${{ secrets.CONTAINER_REGISTRY }}/product_service:latest
         run: |
-          docker build -t ${{ secrets.CONTAINER_REGISTRY }}/order_service:latest ./backend/order_service
-          docker push ${{ env.CONTAINER_REGISTRY }}/order_service:latest
+          echo "Building image: $TAG"
+          docker build -t "$TAG" .
+          docker push "$TAG"
+
+      # Build & Push Order Service
+      - name: Build & push Order Service image
+        working-directory: backend/order_service
+        env:
+          TAG: ${{ secrets.CONTAINER_REGISTRY }}/order_service:latest
+        run: |
+          echo "Building image: $TAG"
+          docker build -t "$TAG" .
+          docker push "$TAG"
