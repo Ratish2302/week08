@@ -90,7 +90,7 @@ jobs:
       - name: Login to Azure Container Registry (Docker)
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.CONTAINER_REGISTRY }}   # e.g. wk08acr12345.azurecr.io
+          registry: ${{ secrets.CONTAINER_REGISTRY }}   # e.g. wk08acr12345.azurecr.io
           username: ${{ secrets.REGISTRY_UN }}
           password: ${{ secrets.REGISTRY_PW }}
 
