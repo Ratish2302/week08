@@ -2,9 +2,11 @@ name: Build and Push Images
 on:
   push:
     branches: [main]
+
 permissions:
   contents: read
   packages: write
+
 jobs:
   docker:
     runs-on: ubuntu-latest
@@ -13,24 +15,36 @@ jobs:
       matrix:
         include:
           - name: product-service
-            context: backend/product_service
+            context: backend/product_service     # <-- change to backend/product_Service if that's your folder name
           - name: order-service
             context: backend/order_service
+
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+
+      # use lowercase owner for GHCR repo path
+      - name: Set lower-case owner
+        id: vars
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ steps.vars.outputs.owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        run: echo "IMAGE=ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}" >> $GITHUB_OUTPUT
-      - uses: docker/build-push-action@v6
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           push: true
           tags: |
-            ${{ steps.meta.outputs.IMAGE }}:latest
-            ${{ steps.meta.outputs.IMAGE }}:${{ github.sha }}
+            ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.name }}:latest
+            ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
