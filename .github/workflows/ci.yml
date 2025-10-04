@@ -1,0 +1,37 @@
+name: PR CI
+on:
+  pull_request:
+    branches: [main, development]
+  push:
+    branches: [development]
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  python-ci:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - backend/product_service
+          - backend/order_service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('${{ matrix.service }}/requirements*.txt') }}
+      - name: Install deps
+        run: |
+          if [ -f "${{ matrix.service }}/requirements.txt" ]; then pip install -r "${{ matrix.service }}/requirements.txt"; fi
+          if [ -f "${{ matrix.service }}/requirements-dev.txt" ]; then pip install -r "${{ matrix.service }}/requirements-dev.txt"; fi
+          pip install pytest flake8
+      - name: Lint
+        run: flake8 "${{ matrix.service }}"
+      - name: Test
+        run: |
+          if [ -d "${{ matrix.service }}/tests" ]; then pytest "${{ matrix.service }}/tests" -q; else echo "No tests"; fi
